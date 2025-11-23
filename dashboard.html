@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard</title>
+
+  <!-- TailwindCSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      background: #0f172a;
+      color: white;
+      font-family: "Inter", sans-serif;
+    }
+
+    .glass-nav {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .hover-tab:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    table tbody tr:nth-child(even) {
+      background: rgba(255,255,255,0.03);
+    }
+  </style>
+</head>
+
+<body class="min-h-screen p-6">
+
+  <!-- Top Navigation -->
+  <div class="glass-nav w-full flex items-center justify-between px-6 py-3 rounded-xl mb-6 shadow-lg">
+    
+    <!-- Left: Title -->
+    <div class="text-2xl font-bold">ภาพรวมพอร์ต</div>
+
+    <!-- Center: Menu -->
+    <div class="flex gap-8 text-gray-300 text-lg">
+      <a href="dashboard.html" class="hover-tab px-3 py-1 rounded-lg">Dashboard</a>
+      <a href="add-transaction.html" class="hover-tab px-3 py-1 rounded-lg">Add Transaction</a>
+      <a href="history.html" class="hover-tab px-3 py-1 rounded-lg">History</a>
+      <a href="settings.html" class="hover-tab px-3 py-1 rounded-lg">Settings</a>
+    </div>
+
+    <!-- Right: Logout -->
+    <button onclick="logout()" 
+            class="bg-red-600 px-4 py-2 rounded-lg hover:bg-red-700 shadow-md">
+      ออกจากระบบ
+    </button>
+  </div>
+
+  <!-- Sorting Buttons -->
+  <div class="mb-6 flex gap-4 justify-center">
+    <button onclick="changeSort('usd')" 
+      class="px-4 py-2 bg-blue-700 rounded-lg hover:bg-blue-800 shadow">
+      เรียงตามมูลค่า USD
+    </button>
+
+    <button onclick="changeSort('thb')" 
+      class="px-4 py-2 bg-green-700 rounded-lg hover:bg-green-800 shadow">
+      เรียงตามมูลค่า THB
+    </button>
+
+    <button onclick="changeSort('invest')" 
+      class="px-4 py-2 bg-yellow-600 rounded-lg hover:bg-yellow-700 shadow">
+      เรียงตามจำนวนเงินลงทุน (THB)
+    </button>
+  </div>
+
+  <!-- Pie Chart Section -->
+  <div class="bg-slate-800/60 p-6 rounded-xl mb-6 shadow-lg flex justify-center border border-slate-700/40">
+    <div class="w-full max-w-[600px]">
+      <canvas id="pieChart" height="350"></canvas>
+    </div>
+  </div>
+
+  <!-- Table Section -->
+  <div class="bg-slate-800/60 p-6 rounded-xl shadow-lg border border-slate-700/40 overflow-auto">
+    <table class="w-full text-left">
+      <thead>
+        <tr class="border-b border-slate-700">
+          <th class="py-2">Ticker</th>
+          <th>Holdings %</th>
+          <th>Holding Value</th>
+          <th>Avg Cost (USD)</th>
+          <th>Price (USD)</th>
+          <th>Total Cost USD</th>
+          <th>Total Cost THB</th>
+          <th>Capital (THB)</th>
+          <th>Net profit (THB)</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+<script>
+  const API_URL = "https://script.google.com/macros/s/AKfycbyGo4vLEbJiDsiJ4b9d4njFjbJ-rVnaSGVT39VCjPBXiZyHz94mknnoJHkg15yjtLOi/exec";
+
+  let portfolioData = [];
+  let currentSort = "usd";
+  let chart;
+
+  if (!sessionStorage.getItem("username")) {
+    window.location.href = "index.html";
+  }
+
+  function logout() {
+    sessionStorage.clear();
+    window.location.href = "index.html";
+  }
+
+  async function loadData() {
+    try {
+      const res = await fetch(API_URL + "?action=getPortfolioData", { method: "POST" });
+      const data = await res.json();
+      if (!data.success) return;
+
+      portfolioData = data.portfolio;
+      render();
+      
+    } catch (error) {
+      console.error("Load error:", error);
+    }
+  }
+
+  function changeSort(type) {
+    currentSort = type;
+    render();
+  }
+
+  function render() {
+    let sorted = [...portfolioData];
+
+    if (currentSort === "usd") sorted.sort((a,b) => b.current_value_usd - a.current_value_usd);
+    else if (currentSort === "thb") sorted.sort((a,b) => b.current_value_thb - a.current_value_thb);
+    else if (currentSort === "invest") sorted.sort((a,b) => b.invested_thb - a.invested_thb);
+
+    renderTable(sorted);
+    renderChart(sorted);
+  }
+
+  function renderTable(list) {
+    const body = document.getElementById("tableBody");
+    body.innerHTML = "";
+
+    const totalTHB = list.reduce((sum, i) => sum + i.current_value_thb, 0);
+
+    list.forEach(item => {
+      const percent = (item.current_value_thb / totalTHB) * 100;
+
+      body.innerHTML += `
+        <tr class="border-b border-slate-700/40">
+          <td class="py-2">${item.ticker}</td>
+          <td class="text-blue-300 font-semibold">${percent.toFixed(2)}%</td>
+          <td>${item.remaining_shares.toFixed(4)}</td>
+          <td>${item.avg_cost_usd.toFixed(2)}</td>
+          <td>${item.current_price_usd.toFixed(2)}</td>
+          <td>${item.current_value_usd.toFixed(2)}</td>
+          <td>${item.current_value_thb.toFixed(2)}</td>
+          <td>${item.invested_thb.toFixed(2)}</td>
+          <td class="${item.current_value_thb - item.invested_thb >= 0 ? 'text-green-400' : 'text-red-400'}">
+            ${(item.current_value_thb - item.invested_thb).toFixed(2)}
+          </td>
+        </tr>
+      `;
+    });
+  }
+
+  function renderChart(list) {
+    const labels = list.map(i => i.ticker);
+    const values = list.map(i => 
+      currentSort === "usd" ? i.current_value_usd :
+      currentSort === "thb" ? i.current_value_thb :
+      i.invested_thb
+    );
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(document.getElementById("pieChart"), {
+      type: "pie",
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          borderWidth: 1,
+        }]
+      }
+    });
+  }
+
+  loadData();
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Transaction</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body { 
+      background: #0f172a; 
+      color: white;
+      font-family: "Inter", sans-serif;
+    }
+
+    .glass-nav {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .hover-tab:hover {
+      background: rgba(255,255,255,0.12);
+    }
+
+    .input-box {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+  </style>
+</head>
+
+<body class="min-h-screen p-6">
+
+  <!-- NAV BAR -->
+  <div class="glass-nav w-full flex items-center justify-between px-6 py-3 rounded-xl mb-10 shadow-lg">
+      
+    <!-- Left -->
+    <div class="text-2xl font-bold">เพิ่มรายการ BUY / SELL</div>
+
+    <!-- Center Menu -->
+    <div class="flex gap-8 text-gray-300 text-lg">
+      <a href="dashboard.html" class="hover-tab px-3 py-1 rounded-lg">Dashboard</a>
+      <a href="add_transaction.html" class="hover-tab px-3 py-1 rounded-lg bg-white/10 font-semibold">Add Transaction</a>
+      <a href="history.html" class="hover-tab px-3 py-1 rounded-lg">History</a>
+      <a href="settings.html" class="hover-tab px-3 py-1 rounded-lg">Settings</a>
+    </div>
+
+    <!-- Right Logout -->
+    <button onclick="logout()" 
+            class="bg-red-600 px-4 py-2 rounded-lg hover:bg-red-700 shadow-md">
+      ออกจากระบบ
+    </button>
+  </div>
+
+  <!-- MAIN FORM -->
+  <div class="bg-slate-800/60 p-8 rounded-xl max-w-xl mx-auto shadow-xl border border-slate-700/50">
+
+    <!-- Type -->
+    <label class="block mb-2 text-lg font-medium">ประเภท</label>
+    <select id="type" class="w-full p-3 rounded-lg input-box mb-4">
+      <option value="buy">BUY</option>
+      <option value="sell">SELL</option>
+    </select>
+
+    <!-- Date -->
+    <label class="block mb-2 text-lg font-medium">วันที่</label>
+    <input type="date" id="date" class="w-full p-3 rounded-lg input-box mb-4">
+
+    <!-- Ticker -->
+    <label class="block mb-2 text-lg font-medium">Ticker</label>
+    <input id="ticker" type="text" class="w-full p-3 rounded-lg input-box mb-4"
+           onblur="loadStockPrice()" placeholder="เช่น AAPL, NVDA">
+
+    <!-- Price per Share -->
+    <label class="block mb-2 text-lg font-medium">ราคาต่อหน่วย (USD)</label>
+    <input id="price" type="number" step="0.0001" 
+           class="w-full p-3 rounded-lg input-box mb-4">
+
+    <!-- Shares -->
+    <label class="block mb-2 text-lg font-medium">จำนวนหุ้น</label>
+    <input id="shares" type="number" step="0.0001"
+           class="w-full p-3 rounded-lg input-box mb-4"
+           oninput="calcFromShares()">
+
+    <!-- USD -->
+    <label class="block mb-2 text-lg font-medium">มูลค่า (USD)</label>
+    <input id="usd" type="number" step="0.0001"
+           class="w-full p-3 rounded-lg input-box mb-4"
+           oninput="calcFromUSD()">
+
+    <!-- THB -->
+    <label class="block mb-2 text-lg font-medium">มูลค่า (THB)</label>
+    <input id="thb" type="number" step="0.01"
+           class="w-full p-3 rounded-lg input-box mb-4"
+           oninput="calcFromTHB()">
+
+    <!-- Exchange Rate -->
+    <label class="block mb-2 text-lg font-medium">อัตราแลกเปลี่ยน (THB/USD)</label>
+    <input id="rate" type="number" step="0.0001"
+           class="w-full p-3 rounded-lg input-box mb-6">
+
+    <!-- Button -->
+    <button onclick="saveData()"
+      class="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded-lg font-bold text-lg shadow-md">
+      บันทึกรายการ
+    </button>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"
+       class="fixed bottom-4 right-4 px-4 py-2 bg-green-600 rounded-lg hidden shadow-lg">
+    บันทึกสำเร็จ
+  </div>
+
+<script>
+
+ const API_URL = "https://script.google.com/macros/s/AKfycbyGo4vLEbJiDsiJ4b9d4njFjbJ-rVnaSGVT39VCjPBXiZyHz94mknnoJHkg15yjtLOi/exec";
+
+if (!sessionStorage.getItem("username")) {
+  window.location.href = "index.html";
+}
+
+function logout() {
+  sessionStorage.clear();
+  window.location.href = "index.html";
+}
+
+async function loadStockPrice() {
+  const ticker = document.getElementById("ticker").value.trim().toUpperCase();
+  if (!ticker) return;
+
+  const res = await fetch(API_URL + "?action=getStockPrice&ticker=" + ticker, { method: "POST" });
+  const data = await res.json();
+
+  if (data.success) {
+    document.getElementById("price").value = data.price;
+  }
+}
+
+function calcFromShares() {
+  const shares = Number(document.getElementById("shares").value);
+  const price = Number(document.getElementById("price").value);
+  const rate  = Number(document.getElementById("rate").value);
+
+  document.getElementById("usd").value = (shares * price).toFixed(4);
+  document.getElementById("thb").value = (shares * price * rate).toFixed(2);
+}
+
+function calcFromUSD() {
+  const usd   = Number(document.getElementById("usd").value);
+  const price = Number(document.getElementById("price").value);
+  const rate  = Number(document.getElementById("rate").value);
+
+  document.getElementById("shares").value = (usd / price).toFixed(4);
+  document.getElementById("thb").value = (usd * rate).toFixed(2);
+}
+
+function calcFromTHB() {
+  const thb   = Number(document.getElementById("thb").value);
+  const rate  = Number(document.getElementById("rate").value);
+  const price = Number(document.getElementById("price").value);
+
+  const usd = thb / rate;
+  document.getElementById("usd").value = usd.toFixed(4);
+  document.getElementById("shares").value = (usd / price).toFixed(4);
+}
+
+async function saveData() {
+  const type   = document.getElementById("type").value;
+  const date   = document.getElementById("date").value;
+  const ticker = document.getElementById("ticker").value;
+  const price  = document.getElementById("price").value;
+  const shares = document.getElementById("shares").value;
+  const usd    = document.getElementById("usd").value;
+  const thb    = document.getElementById("thb").value;
+  const rate   = document.getElementById("rate").value;
+
+  const payload = new FormData();
+  payload.append("date", date);
+  payload.append("ticker", ticker);
+  payload.append("price_per_share_usd", price);
+  payload.append("shares", shares);
+  payload.append("usd", usd);
+  payload.append("thb", thb);
+  payload.append("exchange_rate_usd", rate);
+
+  let action = type === "buy" ? "addBuy" : "addSell";
+
+  const res = await fetch(API_URL + "?action=" + action, {
+      method: "POST",
+      body: payload
+  });
+
+  const data = await res.json();
+
+  if (data.success) {
+    showToast("บันทึกสำเร็จ");
+  } else {
+    showToast("เกิดข้อผิดพลาด", true);
+  }
+}
+
+function showToast(msg, isError = false) {
+  const toast = document.getElementById("toast");
+  toast.innerText = msg;
+  toast.classList.remove("hidden");
+
+  toast.style.background = isError ? "#e11d48" : "#16a34a";
+
+  setTimeout(() => toast.classList.add("hidden"), 2500);
+}
+
+</script>
+
+</body>
+</html>
