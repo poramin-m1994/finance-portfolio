@@ -75,12 +75,36 @@
     </button>
   </div>
 
-  <!-- Pie Chart Section -->
-  <div class="bg-slate-800/60 p-6 rounded-xl mb-6 shadow-lg flex justify-center border border-slate-700/40">
-    <div class="w-full max-w-[600px]">
-      <canvas id="pieChart" height="350"></canvas>
+  <!-- Pie Chart + Summary Panel -->
+<div class="bg-slate-800/60 p-6 rounded-xl mb-6 shadow-lg flex gap-6 border border-slate-700/40 justify-center">
+
+  <!-- Chart -->
+  <div class="w-full max-w-[600px]">
+    <canvas id="pieChart" height="350"></canvas>
+  </div>
+
+  <!-- Summary Info -->
+  <div class="min-w-[250px] bg-slate-900/50 p-4 rounded-xl border border-slate-700/40 h-fit">
+    <h2 class="text-xl font-bold mb-3">ข้อมูลสรุปพอร์ต</h2>
+
+    <div class="flex justify-between mb-2">
+      <span>เงินลงทุนรวม (THB)</span>
+      <span id="totalInvest" class="font-semibold text-blue-300">0</span>
+    </div>
+
+    <div class="flex justify-between mb-2">
+      <span>มูลค่าปัจจุบันรวม (THB)</span>
+      <span id="totalValue" class="font-semibold text-green-300">0</span>
+    </div>
+
+    <div class="flex justify-between mt-3 pt-3 border-t border-slate-700/40">
+      <span>กำไรสุทธิ (THB)</span>
+      <span id="totalProfit" class="font-bold">0</span>
     </div>
   </div>
+
+</div>
+
 
   <!-- Table Section -->
   <div class="bg-slate-800/60 p-6 rounded-xl shadow-lg border border-slate-700/40 overflow-auto">
@@ -176,28 +200,65 @@
   }
 
   function renderChart(list) {
-    const labels = list.map(i => i.ticker);
-    const values = list.map(i => 
-      currentSort === "usd" ? i.current_value_usd :
-      currentSort === "thb" ? i.current_value_thb :
-      i.invested_thb
-    );
+  const labels = list.map(i => i.ticker);
+  const values = list.map(i =>
+    currentSort === "usd" ? i.current_value_usd :
+    currentSort === "thb" ? i.current_value_thb :
+    i.invested_thb
+  );
 
-    if (chart) chart.destroy();
+  // หา total สำหรับคิด %
+  const totalValue = values.reduce((a, b) => a + b, 0);
 
-    chart = new Chart(document.getElementById("pieChart"), {
-      type: "pie",
-      data: {
-        labels,
-        datasets: [{
-          data: values,
-          borderWidth: 1,
-        }]
+  if (chart) chart.destroy();
+
+  chart = new Chart(document.getElementById("pieChart"), {
+    type: "pie",
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderWidth: 1
+      }]
+    },
+    options: {
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const value = ctx.raw;
+              const percent = ((value / totalValue) * 100).toFixed(2);
+              return `${ctx.label}: ${value.toLocaleString()} (${percent}%)`;
+            }
+          }
+        }
       }
-    });
-  }
+    }
+  });
+
+  // อัปเดต summary panel
+  updateSummary(list);
+}
+
 
   loadData();
+
+function updateSummary(list) {
+  const totalInvest = list.reduce((sum, i) => sum + i.invested_thb, 0);
+  const totalValue = list.reduce((sum, i) => sum + i.current_value_thb, 0);
+  const profit = totalValue - totalInvest;
+
+  document.getElementById("totalInvest").innerText =
+    totalInvest.toLocaleString("en-US", { minimumFractionDigits: 2 });
+
+  document.getElementById("totalValue").innerText =
+    totalValue.toLocaleString("en-US", { minimumFractionDigits: 2 });
+
+  const profitEl = document.getElementById("totalProfit");
+  profitEl.innerText = profit.toLocaleString("en-US", { minimumFractionDigits: 2 });
+
+  profitEl.className = profit >= 0 ? "text-green-400 font-bold" : "text-red-400 font-bold";
+}
 
 </script>
 
